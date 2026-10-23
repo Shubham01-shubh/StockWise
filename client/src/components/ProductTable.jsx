@@ -1,17 +1,20 @@
 
-import { Pencil, Trash2, Package } from "lucide-react";
+import { Eye, Pencil, Trash2, Package } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function ProductTable({
   products,
   onEdit,
   onDelete,
 }) {
+  const navigate = useNavigate();
+
   const formatCurrency = (amount) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       maximumFractionDigits: 2,
-    }).format(amount);
+    }).format(Number(amount || 0));
 
   if (products.length === 0) {
     return (
@@ -51,6 +54,7 @@ export default function ProductTable({
                 <td>{product.category}</td>
                 <td>{formatCurrency(product.price)}</td>
                 <td>{product.quantity}</td>
+
                 <td>
                   <span
                     className={`status-badge ${
@@ -60,8 +64,21 @@ export default function ProductTable({
                     {isLowStock ? "Low stock" : "In stock"}
                   </span>
                 </td>
+
                 <td>
                   <div className="row-actions">
+                    <button
+                      type="button"
+                      className="action-button"
+                      onClick={() =>
+                        navigate(`/products/${product._id}`)
+                      }
+                      title="View product details"
+                      aria-label={`View details for ${product.name}`}
+                    >
+                      <Eye size={15} />
+                    </button>
+
                     <button
                       type="button"
                       className="action-button edit-action"

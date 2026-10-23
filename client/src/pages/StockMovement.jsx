@@ -7,6 +7,10 @@ import {
   Package,
   RefreshCw,
 } from "lucide-react";
+import {
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 import { getProducts } from "../services/productService";
 
 const API_URL =
@@ -23,6 +27,31 @@ export default function StockMovement() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  // Synchronize the selected movement type with the submenu URL.
+  useEffect(() => {
+    const requestedType = searchParams.get("type");
+
+    if (requestedType === "IN" || requestedType === "OUT") {
+      setType(requestedType);
+      setSuccess("");
+      setError("");
+    } else {
+      setType("IN");
+    }
+  }, [searchParams]);
+
+  // Scroll to Movement History when its submenu link is selected.
+  useEffect(() => {
+    if (location.hash === "#movement-history") {
+      document
+        .getElementById("movement-history")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [location.hash]);
 
   async function loadData() {
     setLoading(true);
@@ -44,7 +73,7 @@ export default function StockMovement() {
       setMovements(movementData);
 
       setProductId((current) =>
-        productData.some((p) => p._id === current)
+        productData.some((product) => product._id === current)
           ? current
           : productData[0]?._id || ""
       );
@@ -68,8 +97,14 @@ export default function StockMovement() {
     setError("");
     setSuccess("");
 
-    if (!productId || !Number.isInteger(Number(quantity)) || Number(quantity) < 1) {
-      setError("Select a product and enter a positive whole-number quantity.");
+    if (
+      !productId ||
+      !Number.isInteger(Number(quantity)) ||
+      Number(quantity) < 1
+    ) {
+      setError(
+        "Select a product and enter a positive whole-number quantity."
+      );
       return;
     }
 
@@ -93,7 +128,7 @@ export default function StockMovement() {
         throw new Error(data.message || "Unable to record movement.");
       }
 
-      setSuccess(data.message);
+      setSuccess(data.message || "Stock movement recorded successfully.");
       setQuantity("1");
       await loadData();
     } catch (err) {
@@ -109,16 +144,27 @@ export default function StockMovement() {
       timeStyle: "short",
     });
 
+  const stockInCount = movements.filter(
+    (movement) => movement.type === "IN"
+  ).length;
+
+  const stockOutCount = movements.filter(
+    (movement) => movement.type === "OUT"
+  ).length;
+
   return (
     <div className="dashboard-page">
       <header className="topbar">
         <div>
           <span className="eyebrow">INVENTORY OPERATIONS</span>
-          <h1>Stock Movement</h1>
-          <p>Record incoming and outgoing stock and review transactions.</p>
+          <h1>Stock Management</h1>
+          <p>
+            Record incoming and outgoing stock and review transactions.
+          </p>
         </div>
 
         <button
+          type="button"
           className="btn-secondary"
           onClick={loadData}
           disabled={loading}
@@ -131,14 +177,82 @@ export default function StockMovement() {
       {error && <div className="error-banner">{error}</div>}
       {success && <div className="success-banner">{success}</div>}
 
+      <div className="stock-overview-cards">
+        <button
+          type="button"
+          className={`stock-overview-card ${
+            type === "IN" ? "selected" : ""
+          }`}
+          onClick={() => {
+            setType("IN");
+            setReason("Purchase");
+            setSuccess("");
+            setError("");
+          }}
+        >
+          <span className="stock-overview-icon stock-in-color">
+            <ArrowDownToLine size={21} />
+          </span>
+          <span className="stock-overview-text">
+            <small>Stock In Transactions</small>
+            <strong>{stockInCount}</strong>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className={`stock-overview-card ${
+            type === "OUT" ? "selected" : ""
+          }`}
+          onClick={() => {
+            setType("OUT");
+            setReason("Sale");
+            setSuccess("");
+            setError("");
+          }}
+        >
+          <span className="stock-overview-icon stock-out-color">
+            <ArrowUpFromLine size={21} />
+          </span>
+          <span className="stock-overview-text">
+            <small>Stock Out Transactions</small>
+            <strong>{stockOutCount}</strong>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          className="stock-overview-card"
+          onClick={() => {
+            document
+              .getElementById("movement-history")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
+        >
+          <span className="stock-overview-icon stock-history-color">
+            <History size={21} />
+          </span>
+          <span className="stock-overview-text">
+            <small>Total Movements</small>
+            <strong>{movements.length}</strong>
+          </span>
+        </button>
+      </div>
+
       <div className="movement-layout">
         <section className="content-card movement-form-card">
           <div className="section-heading">
             <div>
-              <h2>Record a Movement</h2>
+              <h2>
+                {type === "IN" ? "Record Stock In" : "Record Stock Out"}
+              </h2>
               <p>Update inventory quantities.</p>
             </div>
-            <History size={21} />
+            {type === "IN" ? (
+              <ArrowDownToLine size={21} />
+            ) : (
+              <ArrowUpFromLine size={21} />
+            )}
           </div>
 
           <form className="movement-form" onSubmit={handleSubmit}>
@@ -172,7 +286,14 @@ export default function StockMovement() {
               Movement Type
               <select
                 value={type}
-                onChange={(event) => setType(event.target.value)}
+                onChange={(event) => {
+                  setType(event.target.value);
+                  setSuccess("");
+                  setError("");
+                  setReason(
+                    event.target.value === "IN" ? "Purchase" : "Sale"
+                  );
+                }}
               >
                 <option value="IN">Stock In — Add quantity</option>
                 <option value="OUT">Stock Out — Remove quantity</option>
@@ -225,13 +346,18 @@ export default function StockMovement() {
           </form>
         </section>
 
-        <section className="content-card movement-history-card">
+        <section
+          className="content-card movement-history-card"
+          id="movement-history"
+        >
           <div className="section-heading">
             <div>
               <h2>Movement History</h2>
               <p>Latest stock transactions</p>
             </div>
-            <span className="history-count">{movements.length} records</span>
+            <span className="history-count">
+              {movements.length} records
+            </span>
           </div>
 
           {loading ? (
@@ -248,7 +374,9 @@ export default function StockMovement() {
                 <article className="movement-item" key={movement._id}>
                   <div
                     className={`movement-icon ${
-                      movement.type === "IN" ? "movement-in" : "movement-out"
+                      movement.type === "IN"
+                        ? "movement-in"
+                        : "movement-out"
                     }`}
                   >
                     {movement.type === "IN" ? (
@@ -265,7 +393,9 @@ export default function StockMovement() {
                     <span>
                       {movement.reason} · {formatDate(movement.createdAt)}
                     </span>
-                    <small>Balance after: {movement.balanceAfter} units</small>
+                    <small>
+                      Balance after: {movement.balanceAfter} units
+                    </small>
                   </div>
 
                   <div

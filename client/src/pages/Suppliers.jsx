@@ -1,5 +1,10 @@
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Plus,
   Search,
@@ -9,6 +14,7 @@ import {
   Mail,
   Phone,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import SupplierModal from "../components/SupplierModal";
 
 const API_URL =
@@ -21,6 +27,10 @@ export default function Suppliers() {
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState(null);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const action = searchParams.get("action");
 
   const loadSuppliers = useCallback(async () => {
     setLoading(true);
@@ -46,6 +56,14 @@ export default function Suppliers() {
     loadSuppliers();
   }, [loadSuppliers]);
 
+  // Open the Add Supplier modal when selected from the submenu.
+  useEffect(() => {
+    if (action === "add") {
+      setSelectedSupplier(null);
+      setModalOpen(true);
+    }
+  }, [action]);
+
   const filteredSuppliers = useMemo(() => {
     const query = search.trim().toLowerCase();
 
@@ -55,6 +73,7 @@ export default function Suppliers() {
         supplier.contactPerson,
         supplier.email,
         supplier.phone,
+        supplier.address,
       ].some((value) =>
         String(value ?? "").toLowerCase().includes(query)
       )
@@ -81,6 +100,9 @@ export default function Suppliers() {
       throw new Error(data.message || "Unable to save supplier.");
     }
 
+    setModalOpen(false);
+    setSelectedSupplier(null);
+    setSearchParams({});
     await loadSuppliers();
   }
 
@@ -113,6 +135,7 @@ export default function Suppliers() {
 
   function openAddModal() {
     setSelectedSupplier(null);
+    setSearchParams({});
     setModalOpen(true);
   }
 
@@ -166,6 +189,29 @@ export default function Suppliers() {
           </label>
         </div>
 
+        <div className="product-view-filters">
+          <button
+            type="button"
+            className="product-view-button active"
+            onClick={() => {
+              setSearch("");
+              setSearchParams({});
+            }}
+          >
+            <Truck size={16} />
+            All Suppliers
+          </button>
+
+          <button
+            type="button"
+            className="product-view-button"
+            onClick={openAddModal}
+          >
+            <Plus size={16} />
+            Add Supplier
+          </button>
+        </div>
+
         {loading ? (
           <div className="empty-state">Loading suppliers...</div>
         ) : filteredSuppliers.length === 0 ? (
@@ -210,10 +256,14 @@ export default function Suppliers() {
                       )}
                     </td>
                     <td>
-                      <span className="supplier-contact">
-                        <Phone size={13} />
-                        {supplier.phone}
-                      </span>
+                      {supplier.phone ? (
+                        <span className="supplier-contact">
+                          <Phone size={13} />
+                          {supplier.phone}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
                     <td>{supplier.address || "—"}</td>
                     <td>
@@ -253,7 +303,14 @@ export default function Suppliers() {
 
       <SupplierModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setSelectedSupplier(null);
+
+          if (action === "add") {
+            setSearchParams({});
+          }
+        }}
         onSave={handleSave}
         supplier={selectedSupplier}
       />

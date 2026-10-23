@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
+import ProductDetails from "./pages/ProductDetails";
 import StockMovement from "./pages/StockMovement";
 import Suppliers from "./pages/Suppliers";
 import Reports from "./pages/Reports";
@@ -18,30 +19,34 @@ export default function App() {
 
         <main className="main-content">
           <Routes>
-            {/* Dashboard */}
             <Route path="/" element={<Dashboard />} />
 
-            {/* Product Management */}
             <Route path="/products" element={<Products />} />
 
-            {/* Stock Movement Management */}
+            {/* Product Details submenu page */}
+            <Route
+              path="/products/details"
+              element={<ProductDetails />}
+            />
+
+            {/* Details for an individual product */}
+            <Route
+              path="/products/:id"
+              element={<ProductDetails />}
+            />
+
             <Route path="/stock" element={<StockMovement />} />
 
-            {/* Supplier Management */}
             <Route path="/suppliers" element={<Suppliers />} />
 
-            {/* Reports and Analytics */}
             <Route path="/reports" element={<Reports />} />
 
-            {/* Fallback for unimplemented pages */}
             <Route
               path="*"
               element={
                 <div className="placeholder-page">
-                  <h1>Coming soon</h1>
-                  <p>
-                    This module will be added in a later step.
-                  </p>
+                  <h1>Page not found</h1>
+                  <p>The requested page does not exist.</p>
                 </div>
               }
             />

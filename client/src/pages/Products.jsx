@@ -1,6 +1,21 @@
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, Search, Package } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+import {
+  Plus,
+  Search,
+  Package,
+  Tags,
+  AlertTriangle,
+} from "lucide-react";
+import {
+  useSearchParams,
+} from "react-router-dom";
+
 import ProductTable from "../components/ProductTable";
 import ProductModal from "../components/ProductModal";
 import {
@@ -17,6 +32,11 @@ export default function Products() {
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const view = searchParams.get("view") || "all";
+  const action = searchParams.get("action");
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -35,18 +55,52 @@ export default function Products() {
     loadProducts();
   }, [loadProducts]);
 
+  // Open the Add Product modal when selected from the submenu.
+  useEffect(() => {
+    if (action === "add") {
+      setSelectedProduct(null);
+      setModalOpen(true);
+    }
+  }, [action]);
+
+  const categories = useMemo(() => {
+    return [
+      ...new Set(
+        products
+          .map((product) => product.category?.trim())
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+  }, [products]);
+
   const filteredProducts = useMemo(() => {
     const query = search.trim().toLowerCase();
 
-    return products.filter((product) =>
-      [product.name, product.sku, product.category].some((value) =>
+    return products.filter((product) => {
+      const matchesSearch = [
+        product.name,
+        product.sku,
+        product.category,
+      ].some((value) =>
         String(value ?? "").toLowerCase().includes(query)
-      )
-    );
-  }, [products, search]);
+      );
+
+      const threshold = Number(product.lowStockThreshold ?? 10);
+
+      const matchesView =
+        view === "low-stock"
+          ? Number(product.quantity ?? 0) <= threshold
+          : view === "categories"
+            ? Boolean(product.category)
+            : true;
+
+      return matchesSearch && matchesView;
+    });
+  }, [products, search, view]);
 
   function openAddModal() {
     setSelectedProduct(null);
+    setSearchParams({});
     setModalOpen(true);
   }
 
@@ -62,6 +116,9 @@ export default function Products() {
       await createProduct(productData);
     }
 
+    setModalOpen(false);
+    setSelectedProduct(null);
+    setSearchParams({});
     await loadProducts();
   }
 
@@ -82,13 +139,34 @@ export default function Products() {
     }
   }
 
+  function selectView(nextView) {
+    setSearchParams(
+      nextView === "all" ? {} : { view: nextView }
+    );
+    setSearch("");
+  }
+
+  const pageTitle =
+    view === "categories"
+      ? "Product Categories"
+      : view === "low-stock"
+        ? "Low-Stock Products"
+        : "Products";
+
+  const pageDescription =
+    view === "categories"
+      ? "Browse products that have a category assigned."
+      : view === "low-stock"
+        ? "Monitor products that have reached their low-stock threshold."
+        : "Manage your product catalog and stock availability.";
+
   return (
     <div className="dashboard-page">
       <header className="topbar">
         <div>
           <span className="eyebrow">INVENTORY</span>
-          <h1>Products</h1>
-          <p>Manage your product catalog and stock availability.</p>
+          <h1>{pageTitle}</h1>
+          <p>{pageDescription}</p>
         </div>
 
         <button className="btn-primary" onClick={openAddModal}>
@@ -113,7 +191,13 @@ export default function Products() {
         <div className="products-toolbar">
           <div>
             <h2>Product Inventory</h2>
-            <p>View and manage all registered products.</p>
+            <p>
+              {view === "categories"
+                ? `${categories.length} categories found`
+                : view === "low-stock"
+                  ? `${filteredProducts.length} products need attention`
+                  : "View and manage all registered products."}
+            </p>
           </div>
 
           <label className="search-box">
@@ -126,6 +210,56 @@ export default function Products() {
             />
           </label>
         </div>
+
+        <div className="product-view-filters">
+          <button
+            type="button"
+            className={`product-view-button ${
+              view === "all" ? "active" : ""
+            }`}
+            onClick={() => selectView("all")}
+          >
+            <Package size={16} />
+            All Products
+          </button>
+
+          <button
+            type="button"
+            className={`product-view-button ${
+              view === "categories" ? "active" : ""
+            }`}
+            onClick={() => selectView("categories")}
+          >
+            <Tags size={16} />
+            Categories
+          </button>
+
+          <button
+            type="button"
+            className={`product-view-button ${
+              view === "low-stock" ? "active" : ""
+            }`}
+            onClick={() => selectView("low-stock")}
+          >
+            <AlertTriangle size={16} />
+            Low Stock
+          </button>
+        </div>
+
+        {view === "categories" && categories.length > 0 && (
+          <div className="category-list">
+            {categories.map((category) => (
+              <button
+                type="button"
+                key={category}
+                className="category-chip"
+                onClick={() => setSearch(category)}
+              >
+                {category}
+              </button>
+            ))}
+          </div>
+        )}
 
         {loading ? (
           <div className="empty-state">Loading products...</div>
@@ -144,7 +278,14 @@ export default function Products() {
 
       <ProductModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          setSelectedProduct(null);
+
+          if (action === "add") {
+            setSearchParams({});
+          }
+        }}
         onSave={handleSave}
         product={selectedProduct}
       />
